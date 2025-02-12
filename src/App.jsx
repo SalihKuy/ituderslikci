@@ -17,6 +17,7 @@ function App() {
   const [helperStep, setHelperStep] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [token, setToken] = useState("");
 
   useEffect(() => {
     if(date === "") return;
@@ -26,6 +27,12 @@ function App() {
 
     const runPuppeteer = async () => {
       try {
+        await window.electronAPI.runPuppeteer(crnPages);
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        await window.electronAPI.runPuppeteer(crnPages);
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        await window.electronAPI.runPuppeteer(crnPages);
+        await new Promise((resolve) => setTimeout(resolve, 1000));
         await window.electronAPI.runPuppeteer(crnPages);
         const message = language === "en" ? "The courses have been selected." : "Ders seçimi tamamlandı.";
         alert(message);
@@ -56,7 +63,9 @@ function App() {
           setPage(settings.page || 1);
           setLanguage(settings.language || "en");
           setDate(settings.date || "");
+          setToken(settings.token || "");
         }
+        console.log(settings);
       } catch (error) {
         console.error("Failed to load saved data:", error);
       } finally {
@@ -86,7 +95,8 @@ function App() {
         const settings = {
           page: page || 1,
           language: language || "en",
-          date: date || ""
+          date: date || "",
+          token: token || ""
         };
         await window.electronAPI.saveSettings(settings);
       } catch (error) {
@@ -96,7 +106,7 @@ function App() {
 
     const timeoutId = setTimeout(saveSettings, 300);
     return () => clearTimeout(timeoutId);
-  }, [page, language, date, isInitialized]);
+  }, [page, language, date, token, isInitialized]);
 
   function handleChange(id, e) {
     const value = e.target.value;
@@ -106,9 +116,6 @@ function App() {
     }));
   }
 
-  async function startChr() {
-    startChrome();
-  }
 
   function startHelper() {
     let darkdiv = document.getElementById("dark");
@@ -163,7 +170,7 @@ function App() {
 
   async function startChrome() {
     try {
-      await window.electronAPI.startChrome();
+      setToken(await window.electronAPI.getToken());
       const message = language === "en" ? "Chrome has been launched." : "Chrome başlatıldı.";
       alert(message);
     } catch (error) {
@@ -212,7 +219,7 @@ function App() {
             <button onClick={saveCRNs} onMouseEnter={(e) => { e.target.style.backgroundColor = "#87cefa"; }} onMouseLeave={(e) => { e.target.style.backgroundColor = "#1e90ff"; }} style={{ cursor: "pointer", width: "80%", borderRadius: "8px", height: "30%", minHeight: "50px", backgroundColor: "#1e90ff", color: "#000000", fontSize: "24px", transition: "background-color 0.3s ease" }}>{language == "en" ? "Save CRNs" : "CRNleri Kaydet"}</button>
           </div>
           <div id="startChr" style={{ display: "flex", flex: "1", backgroundColor: "#222222", justifyContent: "center", alignItems: "center" }}>
-            <button onClick={startChr} onMouseEnter={(e) => { e.target.style.backgroundColor = "#87cefa"; }} onMouseLeave={(e) => { e.target.style.backgroundColor = "#1e90ff"; }} style={{ cursor: "pointer", width: "80%", borderRadius: "8px", height: "30%", minHeight: "50px", backgroundColor: "#1e90ff", color: "#000000", fontSize: "24px", transition: "background-color 0.3s ease" }}>{language == "en" ? "Launch Chrome" : "Chrome'u başlat"}</button>
+            <button onClick={startChrome} onMouseEnter={(e) => { e.target.style.backgroundColor = "#87cefa"; }} onMouseLeave={(e) => { e.target.style.backgroundColor = "#1e90ff"; }} style={{ cursor: "pointer", width: "80%", borderRadius: "8px", height: "30%", minHeight: "50px", backgroundColor: "#1e90ff", color: "#000000", fontSize: "24px", transition: "background-color 0.3s ease" }}>{language == "en" ? "Launch Chrome" : "Chrome'u başlat"}</button>
           </div>
           <div id="startHelper" style={{ display: "flex", flex: "1", backgroundColor: "#222222", justifyContent: "center", alignItems: "center" }}>
             <button onClick={startHelper} onMouseEnter={(e) => { e.target.style.backgroundColor = "#87cefa"; }} onMouseLeave={(e) => { e.target.style.backgroundColor = "#1e90ff"; }} style={{ cursor: "pointer", width: "80%", borderRadius: "8px", height: "30%", minHeight: "50px", backgroundColor: "#1e90ff", color: "#000000", fontSize: "24px", transition: "background-color 0.3s ease" }}>{language == "en" ? "How Does It Work?" : "Nasıl Çalışır?"}</button>
@@ -224,7 +231,7 @@ function App() {
           </div>
         </div>
       </div>
-      {isHelperOpen && helperStep == 1 && <p src={left} alt="Icon" style={{ position: "absolute", top: "50%", left: "40%", transform: "translateY(-50%)", width: "500px", height: "110px", zIndex: "1000", color: "#333333", backgroundColor: "#87cefa", borderRadius: "10px", padding: "10px" }}>{language == "en" ? "First thing you need to do is exiting Chrome if it's already running. Then launch Chrome by pressing this button and log in to your itu account by going to the itu obs. You should then go to the Course Enrollment page and keep it open (https://obs.itu.edu.tr/ogrenci/DersKayitIslemleri/DersKayit). Do not open any tabs other than the course enrollment page and if you close Chrome, you need to do this step again." : "İlk olarak yapman gereken Chrome açıksa kapamak. Sonra bu butona basarak Chrome'u başlatmak ve itü obs sitesine gidip hesabına giriş yapmak. Daha sonra ders seçimi kısmına gelip o sayfayı açık bırakman gerek (https://obs.itu.edu.tr/ogrenci/DersKayitIslemleri/DersKayit). Ders seçim sayfasından başka sayfa açma ve Chrome'u kapatırsan bu adımı baştan yapmalısın."}</p>}
+      {isHelperOpen && helperStep == 1 && <p src={left} alt="Icon" style={{ position: "absolute", top: "50%", left: "40%", transform: "translateY(-50%)", width: "200px", height: "110px", zIndex: "1000", color: "#333333", backgroundColor: "#87cefa", borderRadius: "10px", padding: "10px" }}>{language == "en" ? "First thing you need to do is exiting Chrome if it's already running. Then launch Chrome by pressing this button and log in to your itu account." : "İlk olarak yapman gereken Chrome açıksa kapamak. Sonra bu butona basarak Chrome'u başlatmak ve itü obs sitesine gidip hesabına giriş yapmak."}</p>}
       {isHelperOpen && helperStep == 2 && <img src={left} alt="Icon" style={{ position: "absolute", top: "22%", left: "23%", transform: "translateY(-50%)", height: "50px", zIndex: "1000" }} />}
       {isHelperOpen && helperStep == 2 && <img src={left} alt="Icon" style={{ position: "absolute", top: "44%", left: "23%", transform: "translateY(-50%)", height: "50px", zIndex: "1000" }} />}
       {isHelperOpen && helperStep == 2 && <img src={left} alt="Icon" style={{ position: "absolute", top: "66%", left: "23%", transform: "translateY(-50%)", height: "50px", zIndex: "1000" }} />}

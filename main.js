@@ -4,7 +4,7 @@ import { fileURLToPath } from 'url';
 import process from 'process';
 import fs from 'fs/promises';
 import run from './src/puppeteer.js';
-import startChrome from './src/chrome.js';
+import getToken from './src/token.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -22,7 +22,7 @@ async function setupIpcHandlers() {
       }));
       return true;
     } catch (error) {
-      console.error('Failed to save CRN data:', error);
+      console.error(error);
       return false;
     }
   });
@@ -32,7 +32,7 @@ async function setupIpcHandlers() {
       const data = await fs.readFile(crnDataPath, 'utf8');
       return JSON.parse(data).crns;
     } catch (error) {
-      console.error('Failed to load CRN data:', error);
+      console.error(error);
       return { 1: Array(12).fill(''), 2: Array(12).fill(''), 3: Array(12).fill('') };
     }
   });
@@ -42,7 +42,7 @@ async function setupIpcHandlers() {
       await fs.writeFile(settingsPath, JSON.stringify(settings));
       return true;
     } catch (error) {
-      console.error('Failed to save settings:', error);
+      console.error(error);
       return false;
     }
   });
@@ -52,7 +52,7 @@ async function setupIpcHandlers() {
       const data = await fs.readFile(settingsPath, 'utf8');
       return JSON.parse(data);
     } catch (error) {
-      console.error('Failed to load settings:', error);
+      console.error(error);
       return { page: 1, language: 'en', date: new Date().toISOString() };
     }
   });
@@ -62,18 +62,22 @@ async function setupIpcHandlers() {
       await run(crnList);
       return true;
     } catch (error) {
-      console.error('Failed to run Puppeteer:', error);
+      console.error(error);
       return false;
     }
   });
 
-  ipcMain.handle('start-chrome', async () => {
+  ipcMain.handle('get-token', async () => {
     try {
-      await startChrome();
-      return true;
+      const token = await getToken();
+      if (token) {
+        return token;
+      } else {
+        throw new Error('Token not captured');
+      }
     } catch (error) {
-      console.error('Failed to start Chrome:', error);
-      return false;
+      console.error(error);
+      return null;
     }
   });
 }
@@ -115,7 +119,7 @@ async function init() {
       }
     });
   } catch (error) {
-    console.error('Failed to initialize app:', error);
+    console.error(error);
     app.quit();
   }
 }
@@ -134,6 +138,6 @@ app.on('activate', () => {
 });
 
 init().catch(error => {
-  console.error('Failed to start app:', error);
+  console.error(error);
   app.quit();
 });

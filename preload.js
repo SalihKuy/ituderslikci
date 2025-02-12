@@ -6,5 +6,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
   loadSettings: () => ipcRenderer.invoke('load-settings'),
   saveSettings: (settings) => ipcRenderer.invoke('save-settings', settings),
   runPuppeteer: (crnList) => ipcRenderer.invoke('run-puppeteer', crnList),
-  startChrome: () => ipcRenderer.invoke('start-chrome')
+  getToken: () => ipcRenderer.invoke('get-token'),
 });
