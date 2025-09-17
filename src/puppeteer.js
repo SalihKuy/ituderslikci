@@ -12,7 +12,7 @@ async function getTokenFromSettings() {
     const settings = JSON.parse(data);
     return settings.token;
   } catch (error) {
-    console.error(error);
+    console.error('Error reading token from settings:', error);
     return null;
   }
 }
@@ -20,7 +20,11 @@ async function getTokenFromSettings() {
 async function runOptimal(crnPages) {
   const token = await getTokenFromSettings();
   if (!token) {
-    return;
+    return {
+      enrolled: [],
+      failed: [],
+      error: 'No authentication token available. Please launch Chrome and login first.'
+    };
   }
 
   const url = "https://obs.itu.edu.tr/api/ders-kayit/v21";
@@ -95,8 +99,6 @@ async function runOptimal(crnPages) {
 async function attemptEnrollment(url, headers, crns, results, phase) {
   if (crns.length === 0) return;
 
-  console.log(`Attempting enrollment for ${crns.length} CRNs in ${phase} phase`);
-  
   const body = JSON.stringify({
     ECRN: crns,
     SCRN: []
@@ -109,8 +111,11 @@ async function attemptEnrollment(url, headers, crns, results, phase) {
       body
     });
 
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
     const responseData = await response.json();
-    console.log(`${phase} Response:`, responseData);
 
     if (responseData.ecrnResultList) {
       responseData.ecrnResultList.forEach(result => {
@@ -123,7 +128,6 @@ async function attemptEnrollment(url, headers, crns, results, phase) {
             timestamp: new Date().toISOString(),
             result: result
           });
-          console.log(`Successfully enrolled in CRN ${result.crn}`);
         } else {
           results.failed.push({
             crn: result.crn,
@@ -132,7 +136,6 @@ async function attemptEnrollment(url, headers, crns, results, phase) {
             result: result,
             priority: getPriorityFromPhase(phase)
           });
-          console.log(`Failed to enroll in CRN ${result.crn}: ${result.resultCode}`);
         }
       });
     }
