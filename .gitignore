@@ -13,6 +13,21 @@ node_modules
 # Build output
 dist
 dist-ssr
+dist-electron
+
+# Electron build artifacts
+*.dmg
+*.exe
+*.deb
+*.rpm
+*.AppImage
+*.snap
+*.pkg
+*.msi
+*.blockmap
+latest*.yml
+builder-debug.yml
+builder-effective-config.yaml
 
 # Local configuration files
 *.local

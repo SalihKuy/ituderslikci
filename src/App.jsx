@@ -18,6 +18,8 @@ function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [isInitialized, setIsInitialized] = useState(false);
   const [token, setToken] = useState("");
+  const [enrollmentResults, setEnrollmentResults] = useState(null);
+  const [isEnrollmentInProgress, setIsEnrollmentInProgress] = useState(false);
 
   useEffect(() => {
     if(date === "") return;
@@ -27,17 +29,29 @@ function App() {
 
     const runPuppeteer = async () => {
       try {
-        await window.electronAPI.runPuppeteer(crnPages);
-        await new Promise((resolve) => setTimeout(resolve, 100));
-        await window.electronAPI.runPuppeteer(crnPages);
-        await new Promise((resolve) => setTimeout(resolve, 100));
-        await window.electronAPI.runPuppeteer(crnPages);
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-        await window.electronAPI.runPuppeteer(crnPages);
-        const message = language === "en" ? "The courses have been selected." : "Ders seçimi tamamlandı.";
+        setIsEnrollmentInProgress(true);
+        setEnrollmentResults(null);
+        
+        const results = await window.electronAPI.runPuppeteer(crnPages);
+        
+        // Display results in UI instead of just alert
+        setEnrollmentResults(results);
+        setIsEnrollmentInProgress(false);
+        
+        const enrolledCount = results?.enrolled?.length || 0;
+        const failedCount = results?.failed?.length || 0;
+        const message = language === "en" 
+          ? `Enrollment complete! Enrolled: ${enrolledCount}, Failed: ${failedCount}` 
+          : `Ders seçimi tamamlandı! Alınan: ${enrolledCount}, Alınamayan: ${failedCount}`;
         alert(message);
       } catch (error) {
         console.error("Failed to run Puppeteer script:", error);
+        setIsEnrollmentInProgress(false);
+        setEnrollmentResults({
+          enrolled: [],
+          failed: [],
+          error: error.message
+        });
       }
     };
 
@@ -231,6 +245,145 @@ function App() {
           </div>
         </div>
       </div>
+      
+      {/* Enrollment Progress Indicator */}
+      {isEnrollmentInProgress && (
+        <div style={{ 
+          position: "fixed", 
+          top: "50%", 
+          left: "50%", 
+          transform: "translate(-50%, -50%)", 
+          backgroundColor: "#333333", 
+          color: "#EEEEEE", 
+          padding: "20px", 
+          borderRadius: "10px", 
+          zIndex: "2000",
+          textAlign: "center"
+        }}>
+          <div style={{ fontSize: "18px", marginBottom: "10px" }}>
+            {language === "en" ? "Enrollment in progress..." : "Ders seçimi devam ediyor..."}
+          </div>
+          <div style={{ fontSize: "14px" }}>
+            {language === "en" ? "Please wait..." : "Lütfen bekleyin..."}
+          </div>
+        </div>
+      )}
+      
+      {/* Enrollment Results Display */}
+      {enrollmentResults && !isEnrollmentInProgress && (
+        <div style={{ 
+          position: "fixed", 
+          top: "50%", 
+          left: "50%", 
+          transform: "translate(-50%, -50%)", 
+          backgroundColor: "#333333", 
+          color: "#EEEEEE", 
+          padding: "20px", 
+          borderRadius: "10px", 
+          zIndex: "2000",
+          maxWidth: "80%",
+          maxHeight: "80%",
+          overflow: "auto"
+        }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+            <h3 style={{ margin: 0, color: "#87cefa" }}>
+              {language === "en" ? "Enrollment Results" : "Ders Seçimi Sonuçları"}
+            </h3>
+            <button 
+              onClick={() => setEnrollmentResults(null)}
+              style={{ 
+                backgroundColor: "#ff6b6b", 
+                color: "white", 
+                border: "none", 
+                padding: "5px 10px", 
+                borderRadius: "5px", 
+                cursor: "pointer" 
+              }}
+            >
+              ✕
+            </button>
+          </div>
+          
+          {enrollmentResults.error ? (
+            <div style={{ color: "#ff6b6b", textAlign: "center" }}>
+              <div style={{ fontSize: "16px", marginBottom: "10px" }}>
+                {language === "en" ? "Error occurred:" : "Hata oluştu:"}
+              </div>
+              <div>{enrollmentResults.error}</div>
+            </div>
+          ) : (
+            <div>
+              {/* Success Section */}
+              {enrollmentResults.enrolled && enrollmentResults.enrolled.length > 0 && (
+                <div style={{ marginBottom: "20px" }}>
+                  <h4 style={{ color: "#00ff00", margin: "0 0 10px 0" }}>
+                    {language === "en" 
+                      ? `Successfully Enrolled (${enrollmentResults.enrolled.length})` 
+                      : `Başarıyla Alınan Dersler (${enrollmentResults.enrolled.length})`}
+                  </h4>
+                  {enrollmentResults.enrolled.map((course, index) => (
+                    <div key={index} style={{ 
+                      backgroundColor: "#444444", 
+                      padding: "8px", 
+                      margin: "5px 0", 
+                      borderRadius: "5px",
+                      borderLeft: "4px solid #00ff00"
+                    }}>
+                      <div style={{ fontWeight: "bold" }}>CRN: {course.crn}</div>
+                      <div style={{ fontSize: "12px", color: "#cccccc" }}>
+                        {language === "en" ? "Phase:" : "Aşama:"} {course.phase} | 
+                        {language === "en" ? "Time:" : "Zaman:"} {new Date(course.timestamp).toLocaleTimeString()}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              {/* Failed Section */}
+              {enrollmentResults.failed && enrollmentResults.failed.length > 0 && (
+                <div>
+                  <h4 style={{ color: "#ff6b6b", margin: "0 0 10px 0" }}>
+                    {language === "en" 
+                      ? `Failed to Enroll (${enrollmentResults.failed.length})` 
+                      : `Alınamayan Dersler (${enrollmentResults.failed.length})`}
+                  </h4>
+                  {enrollmentResults.failed.map((course, index) => (
+                    <div key={index} style={{ 
+                      backgroundColor: "#444444", 
+                      padding: "8px", 
+                      margin: "5px 0", 
+                      borderRadius: "5px",
+                      borderLeft: "4px solid #ff6b6b"
+                    }}>
+                      <div style={{ fontWeight: "bold" }}>CRN: {course.crn}</div>
+                      <div style={{ fontSize: "12px", color: "#cccccc" }}>
+                        {language === "en" ? "Error:" : "Hata:"} {course.result?.resultCode || course.error} | 
+                        {language === "en" ? "Priority:" : "Öncelik:"} {course.priority}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              {/* Summary */}
+              <div style={{ 
+                marginTop: "20px", 
+                padding: "10px", 
+                backgroundColor: "#555555", 
+                borderRadius: "5px", 
+                textAlign: "center" 
+              }}>
+                <div style={{ fontSize: "14px" }}>
+                  {language === "en" 
+                    ? `Total: ${(enrollmentResults.enrolled?.length || 0) + (enrollmentResults.failed?.length || 0)} courses processed`
+                    : `Toplam: ${(enrollmentResults.enrolled?.length || 0) + (enrollmentResults.failed?.length || 0)} ders işlendi`}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {isHelperOpen && helperStep == 1 && <p src={left} alt="Icon" style={{ position: "absolute", top: "50%", left: "40%", transform: "translateY(-50%)", width: "200px", height: "110px", zIndex: "1000", color: "#333333", backgroundColor: "#87cefa", borderRadius: "10px", padding: "10px" }}>{language == "en" ? "First thing you need to do is exiting Chrome if it's already running. Then launch Chrome by pressing this button and log in to your itu account." : "İlk olarak yapman gereken Chrome açıksa kapamak. Sonra bu butona basarak Chrome'u başlatmak ve itü obs sitesine gidip hesabına giriş yapmak."}</p>}
       {isHelperOpen && helperStep == 2 && <img src={left} alt="Icon" style={{ position: "absolute", top: "22%", left: "23%", transform: "translateY(-50%)", height: "50px", zIndex: "1000" }} />}
       {isHelperOpen && helperStep == 2 && <img src={left} alt="Icon" style={{ position: "absolute", top: "44%", left: "23%", transform: "translateY(-50%)", height: "50px", zIndex: "1000" }} />}

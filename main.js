@@ -59,11 +59,15 @@ async function setupIpcHandlers() {
 
   ipcMain.handle('run-puppeteer', async (_, crnList) => {
     try {
-      await run(crnList);
-      return true;
+      const results = await run(crnList);
+      return results || { enrolled: [], failed: [] };
     } catch (error) {
       console.error(error);
-      return false;
+      return { 
+        enrolled: [], 
+        failed: [], 
+        error: error.message 
+      };
     }
   });
 

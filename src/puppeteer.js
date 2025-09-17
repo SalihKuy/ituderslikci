@@ -17,44 +17,156 @@ async function getTokenFromSettings() {
   }
 }
 
-async function run(crnList) {
-
+async function runOptimal(crnPages) {
   const token = await getTokenFromSettings();
   if (!token) {
-    console.error('Failed to retrieve token');
     return;
   }
 
   const url = "https://obs.itu.edu.tr/api/ders-kayit/v21";
+  
+  const headers = {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`,
+    'Accept': 'application/json',
+    'Origin': 'https://obs.itu.edu.tr',
+    'Referer': 'https://obs.itu.edu.tr/',
+    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+  };
 
-  for (const key in crnList) {
-    const crns = crnList[key].filter(crn => crn.trim() !== '');
+  const priorityCRNs = {
+    high: crnPages[1]?.filter(crn => crn.trim() !== '') || [],
+    medium: crnPages[2]?.filter(crn => crn.trim() !== '') || [],
+    low: crnPages[3]?.filter(crn => crn.trim() !== '') || []
+  };
 
-    if (crns.length === 0) {
-      continue;
+  const results = {
+    enrolled: [],
+    failed: [],
+    pending: []
+  };
+
+  if (priorityCRNs.high.length > 0) {
+    await attemptEnrollment(url, headers, priorityCRNs.high, results, 'HIGH');
+    
+    const highPriorityFailures = results.failed.filter(f => f.priority === 'HIGH').map(f => f.crn);
+    if (highPriorityFailures.length > 0) {
+      await attemptEnrollment(url, headers, highPriorityFailures, results, 'HIGH-RETRY');
     }
+  }
 
-    const body = JSON.stringify({
-      ECRN: crns,
-      SCRN: []
+  if (priorityCRNs.medium.length > 0) {
+    await new Promise(resolve => setTimeout(resolve, 500));
+    await attemptEnrollment(url, headers, priorityCRNs.medium, results, 'MEDIUM');
+  }
+
+  if (priorityCRNs.low.length > 0) {
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    await attemptEnrollment(url, headers, priorityCRNs.low, results, 'LOW');
+  }
+
+  const remainingFailures = results.failed.filter(f => f.crn);
+  if (remainingFailures.length > 0) {
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      const highPriorityRetries = remainingFailures.filter(f => f.priority === 'HIGH').map(f => f.crn);
+      const mediumPriorityRetries = remainingFailures.filter(f => f.priority === 'MEDIUM').map(f => f.crn);
+      const lowPriorityRetries = remainingFailures.filter(f => f.priority === 'LOW').map(f => f.crn);
+      
+      if (highPriorityRetries.length > 0) {
+        await attemptEnrollment(url, headers, highPriorityRetries, results, `FINAL-HIGH-${attempt}`);
+      }
+      if (mediumPriorityRetries.length > 0) {
+        await attemptEnrollment(url, headers, mediumPriorityRetries, results, `FINAL-MEDIUM-${attempt}`);
+      }
+      if (lowPriorityRetries.length > 0) {
+        await attemptEnrollment(url, headers, lowPriorityRetries, results, `FINAL-LOW-${attempt}`);
+      }
+      
+      const newFailures = results.failed.map(f => f.crn);
+      if (newFailures.length === 0) break;
+    }
+  }
+
+  return results;
+}
+
+async function attemptEnrollment(url, headers, crns, results, phase) {
+  if (crns.length === 0) return;
+
+  console.log(`Attempting enrollment for ${crns.length} CRNs in ${phase} phase`);
+  
+  const body = JSON.stringify({
+    ECRN: crns,
+    SCRN: []
+  });
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body
     });
 
-    try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: body
-      });
+    const responseData = await response.json();
+    console.log(`${phase} Response:`, responseData);
 
-      const responseData = await response.json();
-      console.log(responseData);
-    } catch (error) {
-      console.error(error);
+    if (responseData.ecrnResultList) {
+      responseData.ecrnResultList.forEach(result => {
+        results.failed = results.failed.filter(f => f.crn !== result.crn);
+        
+        if (isEnrollmentSuccessful(result)) {
+          results.enrolled.push({
+            crn: result.crn,
+            phase: phase,
+            timestamp: new Date().toISOString(),
+            result: result
+          });
+          console.log(`Successfully enrolled in CRN ${result.crn}`);
+        } else {
+          results.failed.push({
+            crn: result.crn,
+            phase: phase,
+            timestamp: new Date().toISOString(),
+            result: result,
+            priority: getPriorityFromPhase(phase)
+          });
+          console.log(`Failed to enroll in CRN ${result.crn}: ${result.resultCode}`);
+        }
+      });
     }
+
+  } catch (error) {
+    console.error(`Error in ${phase} phase:`, error);
+    crns.forEach(crn => {
+      if (!results.enrolled.some(e => e.crn === crn)) {
+        results.failed.push({
+          crn: crn,
+          phase: phase,
+          timestamp: new Date().toISOString(),
+          error: error.message,
+          priority: getPriorityFromPhase(phase)
+        });
+      }
+    });
   }
 }
 
+function getPriorityFromPhase(phase) {
+  if (phase.includes('HIGH')) return 'HIGH';
+  if (phase.includes('MEDIUM')) return 'MEDIUM';
+  if (phase.includes('LOW')) return 'LOW';
+  return 'UNKNOWN';
+}
+
+function isEnrollmentSuccessful(result) {
+  return result.statusCode === 0 || (result.resultCode && !result.resultCode.startsWith('VAL'));
+}
+
+async function run(crnList) {
+  return runOptimal(crnList);
+}
+
 export default run;
+export { runOptimal };

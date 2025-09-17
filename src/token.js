@@ -79,6 +79,7 @@ async function getToken() {
             if (headers.authorization) {
                 const token = headers.authorization.split(" ")[1];
                 if (token) {
+                    console.log("Token retrieved:", token);
                     resolve(token);
                 }
             }
