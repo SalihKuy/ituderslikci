@@ -47,12 +47,20 @@
       "buildResources": "build"
     },
     "compression": "maximum",
-    "files": [
-      "dist/**/*",
-      "src/**/*",
-      "main.js",
-      "preload.js"
+    "asar": true,
+    "asarUnpack": [
+      "**/node_modules/puppeteer/**/*"
     ],
+    "files": [
+      "dist-electron/**/*",
+      "dist/renderer/**/*",
+      "main.js",
+      "preload.js",
+      "src/puppeteer.js",
+      "src/token.js",
+      "package.json"
+    ],
+    "extraResources": [],
     "mac": {
       "target": "dmg",
       "category": "public.app-category.utilities",
