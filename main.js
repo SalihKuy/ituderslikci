@@ -4,7 +4,7 @@ import { fileURLToPath } from 'url';
 import process from 'process';
 import fs from 'fs/promises';
 import run from './src/puppeteer.js';
-import getToken from './src/token.js';
+import getToken, { getTokenWithCredentials } from './src/token.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -75,13 +75,45 @@ async function setupIpcHandlers() {
     try {
       const token = await getToken();
       if (token) {
-        return token;
+        try {
+          const existingSettings = await fs.readFile(settingsPath, 'utf8').catch(() => '{}');
+          const settings = JSON.parse(existingSettings);
+          settings.token = token;
+          await fs.writeFile(settingsPath, JSON.stringify(settings));
+          return token;
+        } catch (saveError) {
+          console.error('Failed to save token:', saveError);
+          throw new Error('Token retrieved but failed to save. Please try signing in again.');
+        }
       } else {
         throw new Error('Token not captured');
       }
     } catch (error) {
       console.error(error);
-      return null;
+      throw error;
+    }
+  });
+
+  ipcMain.handle('get-token-with-credentials', async (_, username, password) => {
+    try {
+      const token = await getTokenWithCredentials(username, password);
+      if (token) {
+        try {
+          const existingSettings = await fs.readFile(settingsPath, 'utf8').catch(() => '{}');
+          const settings = JSON.parse(existingSettings);
+          settings.token = token;
+          await fs.writeFile(settingsPath, JSON.stringify(settings));
+          return token;
+        } catch (saveError) {
+          console.error('Failed to save token:', saveError);
+          throw new Error('Token retrieved but failed to save. Please try signing in again.');
+        }
+      } else {
+        throw new Error('Token not captured');
+      }
+    } catch (error) {
+      console.error(error);
+      throw error;
     }
   });
 }

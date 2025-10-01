@@ -11,7 +11,6 @@ const remoteDebuggingPort = 9222;
 
 async function startChrome() {
     const chromePath = findChrome();
-    // Use Electron's userData directory instead of process.cwd()
     const userDataDir = path.join(app.getPath('userData'), 'chrome_user_data');
 
     console.log("Starting Chrome with path:", chromePath);
@@ -113,4 +112,95 @@ async function getToken() {
     return token;
 }
 
+async function getTokenWithCredentials(username, password) {
+    console.log("Getting token with credentials...");
+    
+    const chromePath = findChrome();
+    const userDataDir = path.join(app.getPath('userData'), 'chrome_user_data_headless');
+
+    console.log("Starting headless Chrome with path:", chromePath);
+
+    let browser;
+
+    try {
+        browser = await puppeteer.launch({
+            executablePath: chromePath,
+            headless: true,
+            args: [
+                `--user-data-dir=${userDataDir}`,
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-gpu'
+            ]
+        });
+
+        console.log("Headless Chrome launched");
+
+        const page = await browser.newPage();
+        console.log("Created new page");
+
+        await page.setViewport({ width: 1920, height: 1080 });
+
+        try {
+            console.log("Navigating to Kepler...");
+            await page.goto("https://kepler-beta.itu.edu.tr/", {
+                waitUntil: "networkidle0",
+                timeout: 30000
+            });
+            console.log("Successfully navigated to Kepler");
+
+            await page.waitForNavigation({ waitUntil: "networkidle0", timeout: 10000 }).catch(() => {});
+            
+            console.log("Filling in username...");
+            await page.waitForSelector('#ContentPlaceHolder1_tbUserName', { timeout: 10000 });
+            await page.type('#ContentPlaceHolder1_tbUserName', username);
+            
+            console.log("Filling in password...");
+            await page.waitForSelector('#ContentPlaceHolder1_tbPassword', { timeout: 5000 });
+            await page.type('#ContentPlaceHolder1_tbPassword', password);
+            
+            await page.setRequestInterception(true);
+            const tokenPromise = new Promise((resolve, reject) => {
+                const timeout = setTimeout(() => {
+                    reject(new Error("Token retrieval timeout"));
+                }, 60000);
+                
+                page.on("request", (request) => {
+                    const headers = request.headers();
+                    if (headers.authorization) {
+                        const token = headers.authorization.split(" ")[1];
+                        if (token) {
+                            console.log("Token retrieved:", token);
+                            clearTimeout(timeout);
+                            resolve(token);
+                        }
+                    }
+                    request.continue();
+                });
+            });
+            
+            console.log("Clicking login button...");
+            await page.click('#ContentPlaceHolder1_btnLogin');
+            
+            const token = await tokenPromise;
+            
+            await browser.close();
+            return token;
+            
+        } catch (error) {
+            console.error("Failed during automatic login:", error);
+            await browser.close();
+            throw new Error("Automatic login failed: " + error.message);
+        }
+    } catch (error) {
+        console.error("Failed to launch browser:", error);
+        if (browser) {
+            await browser.close();
+        }
+        throw new Error("Failed to start automated login: " + error.message);
+    }
+}
+
 export default getToken;
+export { getTokenWithCredentials };

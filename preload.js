@@ -7,4 +7,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveSettings: (settings) => ipcRenderer.invoke('save-settings', settings),
   runPuppeteer: (crnList) => ipcRenderer.invoke('run-puppeteer', crnList),
   getToken: () => ipcRenderer.invoke('get-token'),
+  getTokenWithCredentials: (username, password) => ipcRenderer.invoke('get-token-with-credentials', username, password),
 });

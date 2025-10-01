@@ -20,6 +20,10 @@ function App() {
   const [token, setToken] = useState("");
   const [enrollmentResults, setEnrollmentResults] = useState(null);
   const [isEnrollmentInProgress, setIsEnrollmentInProgress] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [loginUsername, setLoginUsername] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [isAutoLoginInProgress, setIsAutoLoginInProgress] = useState(false);
 
   useEffect(() => {
     if(date === "") return;
@@ -34,7 +38,6 @@ function App() {
         
         const results = await window.electronAPI.runPuppeteer(crnPages);
         
-        // Display results in UI instead of just alert
         setEnrollmentResults(results);
         setIsEnrollmentInProgress(false);
         
@@ -184,11 +187,58 @@ function App() {
 
   async function startChrome() {
     try {
-      setToken(await window.electronAPI.getToken());
-      const message = language === "en" ? "Chrome has been launched." : "Chrome başlatıldı.";
+      const retrievedToken = await window.electronAPI.getToken();
+      setToken(retrievedToken);
+      const message = language === "en" ? "Chrome has been launched and login successful." : "Chrome başlatıldı ve giriş başarılı.";
       alert(message);
     } catch (error) {
-      console.error("Failed to start Chrome:", error);
+      console.error("Failed to start Chrome or save token:", error);
+      const errorMessage = language === "en" 
+        ? "Failed to save login credentials. Please close Chrome completely and try signing in again." 
+        : "Giriş bilgileri kaydedilemedi. Lütfen Chrome'u tamamen kapatın ve tekrar giriş yapmayı deneyin.";
+      alert(errorMessage);
+      setToken("");
+    }
+  }
+
+  function showLoginOptions() {
+    setShowLoginModal(true);
+  }
+
+  function closeLoginModal() {
+    setShowLoginModal(false);
+    setLoginUsername("");
+    setLoginPassword("");
+  }
+
+  async function handleAutomaticLogin() {
+    if (!loginUsername || !loginPassword) {
+      const message = language === "en" 
+        ? "Please enter both username and password." 
+        : "Lütfen kullanıcı adı ve şifre giriniz.";
+      alert(message);
+      return;
+    }
+
+    try {
+      setIsAutoLoginInProgress(true);
+      const retrievedToken = await window.electronAPI.getTokenWithCredentials(loginUsername, loginPassword);
+      setToken(retrievedToken);
+      setIsAutoLoginInProgress(false);
+      closeLoginModal();
+      
+      const successMessage = language === "en" 
+        ? "Automatic login successful!" 
+        : "Otomatik giriş başarılı!";
+      alert(successMessage);
+    } catch (error) {
+      console.error("Failed to login automatically:", error);
+      setIsAutoLoginInProgress(false);
+      const errorMessage = language === "en" 
+        ? "Automatic login failed. Please check your credentials and try again." 
+        : "Otomatik giriş başarısız. Lütfen bilgilerinizi kontrol edip tekrar deneyin.";
+      alert(errorMessage);
+      setToken("");
     }
   }
 
@@ -233,7 +283,7 @@ function App() {
             <button onClick={saveCRNs} onMouseEnter={(e) => { e.target.style.backgroundColor = "#87cefa"; }} onMouseLeave={(e) => { e.target.style.backgroundColor = "#1e90ff"; }} style={{ cursor: "pointer", width: "80%", borderRadius: "8px", height: "30%", minHeight: "50px", backgroundColor: "#1e90ff", color: "#000000", fontSize: "24px", transition: "background-color 0.3s ease" }}>{language == "en" ? "Save CRNs" : "CRNleri Kaydet"}</button>
           </div>
           <div id="startChr" style={{ display: "flex", flex: "1", backgroundColor: "#222222", justifyContent: "center", alignItems: "center" }}>
-            <button onClick={startChrome} onMouseEnter={(e) => { e.target.style.backgroundColor = "#87cefa"; }} onMouseLeave={(e) => { e.target.style.backgroundColor = "#1e90ff"; }} style={{ cursor: "pointer", width: "80%", borderRadius: "8px", height: "30%", minHeight: "50px", backgroundColor: "#1e90ff", color: "#000000", fontSize: "24px", transition: "background-color 0.3s ease" }}>{language == "en" ? "Launch Chrome" : "Chrome'u başlat"}</button>
+            <button onClick={showLoginOptions} onMouseEnter={(e) => { e.target.style.backgroundColor = "#87cefa"; }} onMouseLeave={(e) => { e.target.style.backgroundColor = "#1e90ff"; }} style={{ cursor: "pointer", width: "80%", borderRadius: "8px", height: "30%", minHeight: "50px", backgroundColor: "#1e90ff", color: "#000000", fontSize: "24px", transition: "background-color 0.3s ease" }}>{language == "en" ? "Login" : "Giriş Yap"}</button>
           </div>
           <div id="startHelper" style={{ display: "flex", flex: "1", backgroundColor: "#222222", justifyContent: "center", alignItems: "center" }}>
             <button onClick={startHelper} onMouseEnter={(e) => { e.target.style.backgroundColor = "#87cefa"; }} onMouseLeave={(e) => { e.target.style.backgroundColor = "#1e90ff"; }} style={{ cursor: "pointer", width: "80%", borderRadius: "8px", height: "30%", minHeight: "50px", backgroundColor: "#1e90ff", color: "#000000", fontSize: "24px", transition: "background-color 0.3s ease" }}>{language == "en" ? "How Does It Work?" : "Nasıl Çalışır?"}</button>
@@ -384,7 +434,7 @@ function App() {
         </div>
       )}
 
-      {isHelperOpen && helperStep == 1 && <p src={left} alt="Icon" style={{ position: "absolute", top: "50%", left: "40%", transform: "translateY(-50%)", width: "200px", height: "110px", zIndex: "1000", color: "#333333", backgroundColor: "#87cefa", borderRadius: "10px", padding: "10px" }}>{language == "en" ? "First thing you need to do is exiting Chrome if it's already running. Then launch Chrome by pressing this button and log in to your itu account." : "İlk olarak yapman gereken Chrome açıksa kapamak. Sonra bu butona basarak Chrome'u başlatmak ve itü obs sitesine gidip hesabına giriş yapmak."}</p>}
+      {isHelperOpen && helperStep == 1 && <p src={left} alt="Icon" style={{ position: "absolute", top: "50%", left: "40%", transform: "translateY(-50%)", width: "200px", height: "160px", zIndex: "1000", color: "#333333", backgroundColor: "#87cefa", borderRadius: "10px", padding: "10px" }}>{language == "en" ? "First thing you need to do is exiting Chrome if it's already running. Then launch Chrome by pressing this button and log in to your itu account. If you don't get the login screen on your first press, close Chrome and press it again." : "İlk olarak yapman gereken Chrome açıksa kapamak. Sonra bu butona basarak Chrome'u başlatmak ve itü obs sitesine gidip hesabına giriş yapmak. Eğer butona ilk basışında itü giriş sayfası açılmazsa Chrome'u kapa ve butona tekrar bas."}</p>}
       {isHelperOpen && helperStep == 2 && <img src={left} alt="Icon" style={{ position: "absolute", top: "22%", left: "23%", transform: "translateY(-50%)", height: "50px", zIndex: "1000" }} />}
       {isHelperOpen && helperStep == 2 && <img src={left} alt="Icon" style={{ position: "absolute", top: "44%", left: "23%", transform: "translateY(-50%)", height: "50px", zIndex: "1000" }} />}
       {isHelperOpen && helperStep == 2 && <img src={left} alt="Icon" style={{ position: "absolute", top: "66%", left: "23%", transform: "translateY(-50%)", height: "50px", zIndex: "1000" }} />}
@@ -401,6 +451,169 @@ function App() {
       {isHelperOpen && helperStep == 3 && <p src={left} alt="Icon" style={{ position: "absolute", top: "50%", left: "40%", transform: "translateY(-50%)", width: "200px", height: "40px", zIndex: "1000", color: "#333333", backgroundColor: "#87cefa", borderRadius: "10px", padding: "10px" }}>{language == "en" ? "After that, click this button to save your CRNs." : "Sonra bu butona tıklayarak CRNlerini kaydet."}</p>}
       {isHelperOpen && helperStep == 4 && <p src={left} alt="Icon" style={{ position: "absolute", top: "50%", left: "40%", transform: "translateY(-50%)", width: "200px", height: "110px", zIndex: "1000", color: "#333333", backgroundColor: "#87cefa", borderRadius: "10px", padding: "10px" }}>{language == "en" ? "And then you should set the date and time of when course enrollment will be available for you. The program will enroll to the courses at the specified time." : "Son olarak, buraya ders seçiminin açılacağı tarih ve saati girmelisin. Bu sayede program belirlenen zamanda dersleri seçecek."}</p>}
       {isHelperOpen && helperStep == 5 && <p src={left} alt="Icon" style={{ position: "absolute", top: "50%", left: "40%", transform: "translateY(-50%)", width: language == "en" ? "200px" : "250px", height: "170px", zIndex: "1000", color: "#333333", backgroundColor: "#87cefa", borderRadius: "10px", padding: "10px" }}>{language == "en" ? "You can use these 2 buttons to switch pages. What the program does is it uses the CRNs at page 1 to enroll to the courses. Then it does the same for page 2 and 3 which you can use as a backup plan if it's not able to get the courses with the CRNs at page 1." : "Bu iki butonu sayfalar arasında geçiş yapmak için kullanabilirsin. İlk olarak program, 1. sayfadaki CRN'leri kullanarak dersleri seçer. Ardından 1. sayfadaki bütün dersleri alamayabileceğin için 2. ve 3. sayfadaki CRNler için de aynı işlemi yapar. 2. ve 3. sayfayı aynı derslerin farklı CRNleri için kullanabilirsin"}</p>}
+      
+      {/* Login Modal */}
+      {showLoginModal && (
+        <div style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          width: "100vw",
+          height: "100vh",
+          backgroundColor: "rgba(0, 0, 0, 0.8)",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          zIndex: 2000
+        }} onClick={(e) => {
+          if (e.target === e.currentTarget) closeLoginModal();
+        }}>
+          <div style={{
+            backgroundColor: "#333333",
+            borderRadius: "15px",
+            padding: "30px",
+            width: "90%",
+            maxWidth: "500px",
+            color: "#EEEEEE"
+          }}>
+            <h2 style={{ textAlign: "center", marginBottom: "20px", color: "#87cefa" }}>
+              {language === "en" ? "Choose Login Method" : "Giriş Yöntemi Seç"}
+            </h2>
+            
+            {/* Manual Login Option */}
+            <div style={{
+              backgroundColor: "#222222",
+              borderRadius: "10px",
+              padding: "20px",
+              marginBottom: "15px"
+            }}>
+              <h3 style={{ color: "#1e90ff", marginBottom: "10px" }}>
+                {language === "en" ? "Manual Login" : "Manuel Giriş"}
+              </h3>
+              <p style={{ fontSize: "14px", marginBottom: "15px" }}>
+                {language === "en" 
+                  ? "Chrome will open and you'll log in manually to your ITU account." 
+                  : "Chrome açılacak ve ITU hesabınıza manuel olarak giriş yapacaksınız."}
+              </p>
+              <button 
+                onClick={() => {
+                  closeLoginModal();
+                  startChrome();
+                }}
+                onMouseEnter={(e) => { e.target.style.backgroundColor = "#87cefa"; }} 
+                onMouseLeave={(e) => { e.target.style.backgroundColor = "#1e90ff"; }}
+                style={{
+                  cursor: "pointer",
+                  width: "100%",
+                  borderRadius: "8px",
+                  padding: "12px",
+                  backgroundColor: "#1e90ff",
+                  color: "#000000",
+                  fontSize: "16px",
+                  fontWeight: "bold",
+                  border: "none",
+                  transition: "background-color 0.3s ease"
+                }}>
+                {language === "en" ? "Launch Chrome" : "Chrome'u Başlat"}
+              </button>
+            </div>
+
+            {/* Automatic Login Option */}
+            <div style={{
+              backgroundColor: "#222222",
+              borderRadius: "10px",
+              padding: "20px",
+              marginBottom: "15px"
+            }}>
+              <h3 style={{ color: "#1e90ff", marginBottom: "10px" }}>
+                {language === "en" ? "Automatic Login" : "Otomatik Giriş"}
+              </h3>
+              <p style={{ fontSize: "14px", marginBottom: "15px" }}>
+                {language === "en" 
+                  ? "Enter your ITU credentials and the system will log in automatically." 
+                  : "ITU bilgilerinizi girin, sistem otomatik olarak giriş yapacak."}
+              </p>
+              <input
+                type="text"
+                placeholder={language === "en" ? "Username" : "Kullanıcı Adı"}
+                value={loginUsername}
+                onChange={(e) => setLoginUsername(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "10px",
+                  borderRadius: "8px",
+                  backgroundColor: "#444444",
+                  color: "#EEEEEE",
+                  border: "1px solid #555555",
+                  marginBottom: "10px",
+                  fontSize: "14px",
+                  boxSizing: "border-box"
+                }}
+              />
+              <input
+                type="password"
+                placeholder={language === "en" ? "Password" : "Şifre"}
+                value={loginPassword}
+                onChange={(e) => setLoginPassword(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "10px",
+                  borderRadius: "8px",
+                  backgroundColor: "#444444",
+                  color: "#EEEEEE",
+                  border: "1px solid #555555",
+                  marginBottom: "15px",
+                  fontSize: "14px",
+                  boxSizing: "border-box"
+                }}
+              />
+              <button 
+                onClick={handleAutomaticLogin}
+                disabled={isAutoLoginInProgress}
+                onMouseEnter={(e) => { if (!isAutoLoginInProgress) e.target.style.backgroundColor = "#87cefa"; }} 
+                onMouseLeave={(e) => { if (!isAutoLoginInProgress) e.target.style.backgroundColor = "#1e90ff"; }}
+                style={{
+                  cursor: isAutoLoginInProgress ? "not-allowed" : "pointer",
+                  width: "100%",
+                  borderRadius: "8px",
+                  padding: "12px",
+                  backgroundColor: isAutoLoginInProgress ? "#666666" : "#1e90ff",
+                  color: "#000000",
+                  fontSize: "16px",
+                  fontWeight: "bold",
+                  border: "none",
+                  transition: "background-color 0.3s ease",
+                  opacity: isAutoLoginInProgress ? 0.7 : 1
+                }}>
+                {isAutoLoginInProgress 
+                  ? (language === "en" ? "Logging in..." : "Giriş yapılıyor...") 
+                  : (language === "en" ? "Login Automatically" : "Otomatik Giriş Yap")}
+              </button>
+            </div>
+
+            {/* Cancel Button */}
+            <button 
+              onClick={closeLoginModal}
+              disabled={isAutoLoginInProgress}
+              onMouseEnter={(e) => { if (!isAutoLoginInProgress) e.target.style.backgroundColor = "#555555"; }} 
+              onMouseLeave={(e) => { if (!isAutoLoginInProgress) e.target.style.backgroundColor = "#444444"; }}
+              style={{
+                cursor: isAutoLoginInProgress ? "not-allowed" : "pointer",
+                width: "100%",
+                borderRadius: "8px",
+                padding: "12px",
+                backgroundColor: "#444444",
+                color: "#EEEEEE",
+                fontSize: "16px",
+                border: "none",
+                transition: "background-color 0.3s ease",
+                opacity: isAutoLoginInProgress ? 0.5 : 1
+              }}>
+              {language === "en" ? "Cancel" : "İptal"}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

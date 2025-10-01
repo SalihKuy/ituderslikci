@@ -10,14 +10,17 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "dist": "electron-builder"
+    "dist": "electron-builder",
+    "dist:mac-arm": "electron-builder --mac --arm64",
+    "dist:win-x86": "electron-builder --win --ia32",
+    "dist:all": "electron-builder --mac --arm64 --win --ia32"
   },
   "dependencies": {
     "chrome-finder": "^1.0.7",
     "fs": "^0.0.1-security",
     "node-fetch": "^3.3.2",
     "path": "^0.12.7",
-    "puppeteer": "^24.1.1",
+    "puppeteer-core": "^24.1.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
@@ -49,7 +52,7 @@
     "compression": "maximum",
     "asar": true,
     "asarUnpack": [
-      "**/node_modules/puppeteer/**/*"
+      "**/node_modules/puppeteer-core/**/*"
     ],
     "files": [
       "dist-electron/**/*",
@@ -62,12 +65,29 @@
     ],
     "extraResources": [],
     "mac": {
-      "target": "dmg",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ],
       "category": "public.app-category.utilities",
-      "icon": "build/icon.icns"
+      "icon": "build/icon.icns",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "identity": null
     },
     "win": {
-      "target": "nsis",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "ia32"
+          ]
+        }
+      ],
       "icon": "build/icon.ico"
     },
     "linux": {
